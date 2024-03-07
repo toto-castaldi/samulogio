@@ -2,4 +2,69 @@ Edito direttamente online che tanto stiamo solo partendo.
 
 Lo userei per tenere traccia di attività.
 
+Idee per progetti futuri/miglioramenti:
+SE 
+
+cablaggio [decidere dove va messo questo codice!]
+
+small	->	mid	->	large
+            //costanti per numero di luci				
+            const int R1 = 12, R2 = 24, R3 = 60;				
+            const int start_small = 0				
+            const int end_small = R1 -1;				
+            const int start_mid = R1;				
+            const int end_mid = R1 + R2 -1;				
+            const int start_large = R1 + R2;				
+            const int end_large = R1 + R2 + R3 -1;				
+
+small	->	large	->	mid
+            //costanti per numero di luci				
+            const int R1 = 12, R2 = 60, R3 = 24;				
+            const int start_small = 0				
+            const int end_small = R1 -1;				
+            const int start_large = R1;				
+            const int end_large = R1 + R2 -1;				
+            const int start_mid = R1 + R2;				
+            const int end_mid = R1 + R2 + R3 -1;				
+
+mid	->	small	->	large
+            //costanti per numero di luci				
+            const int R1 = 24, R2 = 12, R3 = 60;				
+            const int start_mid = 0				
+            const int end_mid = R1 -1;				
+            const int start_small = R1;				
+            const int end_small = R1 + R2 -1;				
+            const int start_large = R1 + R2;				
+            const int end_large = R1 + R2 + R3 -1;				
+
+mid	->	large	->	small
+            //costanti per numero di luci				
+            const int R1 = 24, R2 = 60, R3 = 12;				
+            const int start_mid = 0				
+            const int end_mid = R1 -1;				
+            const int start_large = R1;				
+            const int end_large = R1 + R2 -1;				
+            const int start_small = R1 + R2;				
+            const int end_small = R1 + R2 + R3 -1;				
+
+large	->	small	->	mid
+            //costanti per numero di luci				
+            const int R1 = 60, R2 = 12, R3 = 24;				
+            const int start_large = 0				
+            const int end_large = R1 -1;				
+            const int start_small = R1;				
+            const int end_small = R1 + R2 -1;				
+            const int start_mid = R1 + R2;				
+            const int end_mid = R1 + R2 + R3 -1;				
+
+large	->	mid	->	small
+            //costanti per numero di luci				
+            const int R1 = 60, R2 = 24, R3 = 12;				
+            const int start_large = 0				
+            const int end_large = R1 -1;				
+            const int start_mid = R1;				
+            const int end_mid = R1 + R2 -1;				
+            const int start_small = R1 + R2;				
+            const int end_small = R1 + R2 + R3 -1;				
+
 
