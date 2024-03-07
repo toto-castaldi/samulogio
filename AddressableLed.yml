@@ -1,0 +1,554 @@
+esphome:
+  name: esphome-led
+  on_boot:
+    priority: -100
+    # ...
+    then:
+      - light.turn_on: light_switch
+      - ds1307.read_time:
+# esp8266:
+  # board: esp01
+esp8266:
+  board: nodemcuv2
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "MxaGqn5SMmKfR6XuPYftxRZV61V/2vYwKcJOfhQ/FFQ="
+ota:
+
+wifi:
+  ssid: mySSID
+  password: mypassword
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esphome-display-test"
+
+i2c:
+  sda: 4
+  scl: 5
+  scan: true
+  
+#  id: bus_a
+#captive_portal:
+time:
+  - platform: sntp
+    id: sntp_time
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        ds1307.write_time:
+  - platform: ds1307
+    id: rtc_time
+    address: 0x50
+#  address: 0x68
+
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+
+number:
+  - platform: template
+    id: hhh
+    name: "hour"
+    step: 1
+    min_value: 0
+    max_value: 23
+    optimistic: true
+  - platform: template
+    id: mmm
+    name: "minutes"
+    step: 1
+    min_value: 0
+    max_value: 59
+    optimistic: true
+  - platform: template
+    id: sss
+    name: "seconds"
+    step: 1
+    min_value: 0
+    max_value: 59
+    optimistic: true
+
+
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2811
+    pin: GPIO12
+    num_leds: 96
+    name: "NeoPixel Light"
+    id: light_switch
+    on_turn_on:
+      then:
+        - light.control:
+            id: light_switch
+            effect: Running Dots
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+      - addressable_scan:
+          scan_width: 5
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "anti-clockwork"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            auto time = id(rtc_time).now();
+            int myH = time.hour;
+            int myM = time.minute;
+            int myS = time.second;
+            int lM = 0, lum = 0;
+            auto r = Color(128,0,0);
+            auto g = Color(0,128,0);
+            auto b = Color(0,0,128);
+            
+            
+            
+            it.range(start_small, end_small+1) = b;
+            it.range(start_mid, end_mid+1) = r;
+            it.range(start_large, end_large+1) = g;
+            
+            myH = myH % 12;
+            it.range(start_small, 
+                        start_small + 
+                        (myH + 11) % 12 + 1) 
+                    = Color::BLACK;
+            
+            lM = (((myM + 59) % 60) + 1)*2/5;
+            it.range(start_mid,
+                    start_mid + lM) = Color::BLACK;
+            lM = start_mid + lM;
+            lum = myM % 5;
+            lum *=60;
+            lum += myS;
+            //lum compreso tra 0 e 300
+            if (lum >= 150)
+            {
+            
+                lum -=150;
+                it[lM] = Color::BLACK;
+                lM++;
+            }
+            //lum tra 0 e 150
+            lum = 255-128*lum/150;
+            it[lM] = Color(lum,0,0);
+            it.range(start_large,
+                    start_large + (myS + 59) % 60 + 1) = Color::BLACK;      
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "clockwork"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            auto time = id(rtc_time).now();
+            int myH = time.hour;
+            int myM = time.minute;
+            int myS = time.second;
+            int lM = 0, lum = 0;
+            auto r = Color(128,0,0);
+            auto g = Color(0,128,0);
+            auto b = Color(0,0,128);
+            
+            it.range(0, it.size()) = Color::BLACK;
+            myH = myH % 12;
+            it.range(start_small, 
+                        start_small + 
+                        (myH + 11) % 12 + 1) 
+                    = b;
+            
+            lM = (((myM + 59) % 60) + 1)*2/5;
+            it.range(start_mid,
+                    start_mid + lM) =  r;
+            lM = start_mid + lM;
+            lum = myM % 5;
+            lum *=60;
+            lum += myS;
+            //lum compreso tra 0 e 300
+            if (lum >= 150)
+            {
+            
+                lum -=150;
+                it[lM] = r;
+                lM++;
+            }
+            //lum tra 0 e 150
+            lum = 128*lum/150;
+            it[lM] = Color(lum,0,0);
+            it.range(start_large,
+                    start_large + (myS + 59) % 60 + 1) = g;
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "Comet"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            auto time = id(rtc_time).now();
+            int myH = time.hour;
+            int myM = time.minute;
+            int myS = time.second;
+            int low_cut, mid_cut, high_cut;
+            Color r = Color(128,0,0);
+            Color g = Color(0,128,0);
+            Color b = Color(0,0,128);
+            Color dr = Color (100,0,0);
+            Color db = Color (0,0,50);
+            
+            myH = myH * 5 % 12;
+            it.range(0, it.size()) = Color::BLACK;
+            it[start_large + myS] = g;
+            it[start_large + myM] = it[start_large + myM].get() + r;
+            it[start_large + (myM+59)%60] = it[start_large + (myM+59)%60].get() + (r - dr);
+            it[start_large + (myM+1)%60] = it[start_large + (myM+1)%60].get() + (r - dr);
+            
+            it[start_large + myH] = it[start_large + myH].get() + b;
+            it[start_large + (myH+59)%60] = it[start_large + (myH+59)%60].get() + (b - db);
+            it[start_large + (myH+58)%60] = it[start_large + (myH+58)%60].get() + ((b - db) - db);
+            it[start_large + (myH+1)%60] = it[start_large + (myH+1)%60].get() + (b - db);
+            it[start_large + (myH+2)%60] = it[start_large + (myH+2)%60].get() + ((b - db) - db);
+            
+            
+
+                    
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "One Big Dot"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            auto time = id(rtc_time).now();
+            int myH = time.hour;
+            int myM = time.minute;
+            int myS = time.second;
+            int low_cut, mid_cut, high_cut;
+            auto r = Color(128,0,0);
+            auto g = Color(0,128,0);
+            auto b = Color(0,0,128);
+            
+            myH = myH * 5 % 12;
+            it.range(0, it.size()) = Color::BLACK;
+            it[start_large + myS] = g;
+            it[start_large + myM] = it[start_large + myM].get() + r;
+            it[start_large + myH] = it[start_large + myH].get() + b;
+
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "Running Dots"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int NCICLI_WAIT = 200, NCICLI_RUN = 24;
+            const uint8_t MY_SCALE = 128;
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            static int rH = 0, rM = 0, rS = 0, count_w = 1, count_r = 0;
+            auto time = id(rtc_time).now();
+            
+            int myH = time.hour % 12, myM = time.minute, myS = time.second;
+            
+            Color r = Color(128,0,0);
+            Color g = Color(0,128,0);
+            Color b = Color(0,0,128);
+            Color delta = Color(25,25,25);
+            it.range(start_large, end_large + 1) = Color::BLACK;
+            it[start_large + ((myS-0) % R3)] = g;
+            it[start_large + ((myS-1) % R3)] = g - delta;
+            it[start_large + ((myS-2) % R3)] = g - delta - delta;
+            it[start_large + ((myS-3) % R3)] = g - delta - delta - delta;
+            
+            
+            if (count_w == 0)
+            {
+                count_r = NCICLI_RUN;
+                rH = 0;
+                rM = 0;
+            }else{
+                count_w++;
+                count_w = (count_w % NCICLI_WAIT);
+            }
+            
+            
+            if (count_r != 0)   //Fai l'effetto
+            {
+                if (count_r == NCICLI_RUN) 
+                    it.range(start_small, end_mid + 1) = Color::BLACK;
+                
+                if (rH <= myH)
+                {
+                    it[start_small + rH] = b;
+                    for (int i = 0; i<rH; i++)
+                        it[start_small + i] = it[start_small + i].get()-delta;
+                }
+                rH++;
+                
+                myM = myM * 2 / 5;
+                if (rM <= myM)
+                {
+                    it[start_mid + rM] = r;
+                    for (int i = 0; i<rM; i++)
+                        it[start_mid + i] = it[start_mid + i].get()-delta;
+                }
+                rM++;
+                count_r--;
+                count_w++;
+            }
+            
+            
+            
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "BIG RING"
+          
+          # L'idea è la seguente:
+          # si definiscono un po' di const per inizio/fine dei tre display
+          # myH,myM e myS rappresentano ore, minuti e secondi
+          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
+          # Per ore e secondi è "facile"
+          # Per minuti si deve prendere il resto a 5 minuti
+          # Ogni 5 minuti sono 2 led (da cui il *2/5)
+          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
+          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
+          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
+          
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            auto time = id(rtc_time).now();
+            int myH = time.hour;
+            int myM = time.minute;
+            int myS = time.second;
+            int low_cut, mid_cut, high_cut;
+            auto r = Color(128,0,0);
+            auto g = Color(0,128,0);
+            auto b = Color(0,0,128);
+            auto bot = Color(128,128,128), mid = Color::BLACK, top = Color::BLACK;
+            
+            char myCase = 0;
+            myH = myH * 5;
+            myH = (myH + 59) % 60 + 1;
+            myM = (myM + 59) % 60 + 1;
+            myS = (myS + 59) % 60 + 1;
+            
+            
+            myCase += (myH >= myM? 4: 0);
+            myCase += (myM >= myS? 2: 0);
+            myCase += (myH >= myS? 1: 0);
+            switch (myCase)
+            {
+                case 0: //smh
+                    top = g;
+                    mid = top + r;
+                    high_cut = myS;
+                    mid_cut = myM;
+                    low_cut = myH;
+                    break;
+                case 2: //msh
+                    top = r;
+                    mid = top + g;
+                    high_cut = myM;
+                    mid_cut = myS;
+                    low_cut = myH;
+                    break;
+                case 3: //mhs
+                    top = r;
+                    mid = top + b;
+                    high_cut = myM;
+                    mid_cut = myH;
+                    low_cut = myS;
+                    break;
+                case 4: //shm
+                    top = g;
+                    mid = top + b;
+                    high_cut = myS;
+                    mid_cut = myH;
+                    low_cut = myM;
+                    break;
+               case 5: //hsm
+                    top = b;
+                    mid = top + g;
+                    high_cut = myH;
+                    mid_cut = myS;
+                    low_cut = myM;
+                    break;
+               case 7: //hms
+                    top = b;
+                    mid = top + r;
+                    high_cut = myH;
+                    mid_cut = myM;
+                    low_cut = myS;
+                    break;
+            }
+            it.range(0, it.size()) = Color::BLACK;
+            it.range(start_large, start_large + low_cut) = bot;
+            it.range(start_large + low_cut, start_large + mid_cut) = mid;
+            it.range(start_large + mid_cut, start_large + high_cut) = top;
+
+            
+            
+      - addressable_lambda:
+          update_interval: 5000ms
+          name: "test"
+          
+          lambda: |-
+            //costanti per numero di luci
+            const int R1 = 12, R2 = 24, R3 = 60;
+            const int start_small = 0;
+            const int end_small = start_small - 1 + R1;
+            const int start_mid = end_small + 1;
+            const int end_mid = start_mid - 1 + R2;
+            const int start_large = end_mid + 1;
+            const int end_large = start_large -1 + R3;
+            
+            int myH = id(hhh).state;
+            int myM = id(mmm).state;
+            int myS = id(sss).state;
+            int lM = 0, lum = 0;
+            auto r = Color(128,0,0);
+            auto g = Color(0,128,0);
+            auto b = Color(0,0,128);
+            
+            it.range(0, it.size()) = Color::BLACK;
+            myH = myH % 12;
+            it.range(start_small, 
+                        start_small + 
+                        (myH + 11) % 12 + 1) 
+                    = b;
+            
+            lM = (((myM + 59) % 60) + 1)*2/5;
+            
+            it.range(start_mid,
+                    start_mid + lM) =  r;
+            
+            lM = start_mid + lM;
+            
+            lum = myM % 5;
+            lum *=60;
+            lum += myS;
+            //lum compreso tra 0 e 300
+            
+            if (lum >= 150)
+            {
+            
+                lum -=150;
+                it[lM] = r;
+                lM++;
+            }
+            //lum tra 0 e 150
+            lum = 128*lum/150;
+            it[lM] = Color(lum,0,0);
+            it.range(start_large,
+                    start_large + (myS + 59) % 60 + 1) = g;
+
+            
+web_server:
+  port: 80
