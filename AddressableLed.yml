@@ -85,7 +85,7 @@ light:
       then:
         - light.control:
             id: light_switch
-            effect: Running Dots
+            effect: 5 - 3 - 1
     effects:
       - addressable_rainbow:
       - addressable_color_wipe:
@@ -94,8 +94,8 @@ light:
 
 
       - addressable_lambda:
-          update_interval: 50ms
-          name: "1 Led 3 Rings"
+          update_interval: 200ms
+          name: "Bullet 3 Rings"
           lambda: |-
             auto time = id(rtc_time).now();
             Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
@@ -113,7 +113,7 @@ light:
             
       - addressable_lambda:
           update_interval: 50ms
-          name: "1 Led 1 Ring"
+          name: "Bullet 1 Ring"
           lambda: |-
             auto time = id(rtc_time).now();
             Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
@@ -121,17 +121,16 @@ light:
             
             it.range(0, it.size()) = Color::BLACK;
             
-            myH = Get_Centerpoint(time.hour, 12, samulogio::R1, samulogio::OFFSET_R3, samulogio::START_LARGE);
-            myM = Get_Centerpoint(time.minute, 60, samulogio::R2, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            myH = Get_Centerpoint(time.hour, 12, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            myM = Get_Centerpoint(time.minute, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
             myS = Get_Centerpoint(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
             
             it[myH] = b;
             it[myM] = it[myM].get() + r;
             it[myS] = it[myS].get() + g;
-
       - addressable_lambda:
-          update_interval: 1000ms
-          name: "NEW clockwork"
+          update_interval: 50ms
+          name: "Stripes 3 Rings"
           
           # L'idea è la seguente:
           # si definiscono un po' di const per inizio/fine dei tre display
@@ -148,32 +147,63 @@ light:
           lambda: |-
             auto time = id(rtc_time).now();
             Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
-            Color dr = Color (100,0,0), db = Color (0,0,50);
+            const int myR[4] = {samulogio::START_SMALL, samulogio::START_MID, samulogio::START_LARGE, samulogio::START_LARGE + samulogio::R3};
             int j;
-            std::pair<int, int> myS, myM, myH;
+            std::pair<int, int> myS1, myM1, myH1, myS2, myM2, myH2;
+            std::pair<int, int> *t1, *t2;
+            
+            myH2 = GetFirstAndLastTime(time.hour, 12, samulogio::R1,  samulogio::OFFSET_R1, samulogio::START_SMALL, time.hour, 0);
+            myM2 = GetFirstAndLastTime(time.minute, 60, samulogio::R2, samulogio::OFFSET_R2, samulogio::START_MID, time.minute, 0);
+            myS2 = GetFirstAndLastTime(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, time.second, 0);
+            
+            for (j=0; j < 3; j++)
+            {
+                switch (j)
+                {
+                    case 0:
+                        t1 = &myH1, t2 = &myH2;
+                        break;
+                    case 1:
+                        t1 = &myM1, t2 = &myM2;
+                        break;
+                    case 2:
+                        t1 = &myS1, t2 = &myS2;
+                        break;
+                }
+                if ((t2->first) > (t2->second))
+                {
+                    t1->first = t2->first;
+                    t1->second = myR[j+1];
+                    t2->first = myR[j];
+                }
+                else    //make a useless pair
+                {
+                    t1->first = 1;
+                    t1->second = 0;
+                }
+            }
             
             
-            myS = GetFirstAndLastIndex(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, time.second, 0);
-            myM = GetFirstAndLastIndex(time.minute, 60, samulogio::R2, samulogio::OFFSET_R2, samulogio::START_MID, time.minute, 0);
-            myH = GetFirstAndLastIndex(time.hour, 12, samulogio::R1,  samulogio::OFFSET_R1, samulogio::START_SMALL, time.hour, 0);
-            
-            ESP_LOGI("my_lib","hour %d    %d  vs %d", myH.first, myH.second, time.hour);
-            ESP_LOGI("my_lib","minutes %d    %d vs %d", myM.first, myM.second, time.minute);
-            ESP_LOGI("my_lib","seconds %d    %d vs %d", myS.first, myS.second, time.second);
             it.range(0, it.size()) = Color::BLACK;            
-            for (j = myH.first; j != myH.second; j=(j+1)%samulogio::R1)
+            for (j = myH1.first; j < myH1.second; j++)
                 it[j] = b;
-            for (j = myM.first; j != myM.second; j=(j+1)%samulogio::R2)
+            for (j = myH2.first; j < myH2.second; j++)
+                it[j] = b;
+                
+            for (j = myM1.first; j < myM1.second; j++)
                 it[j] = r;
-            for (j = myS.first; j != myS.second; j=(j+1)%samulogio::R3)
+            for (j = myM2.first; j < myM2.second; j++)
+                it[j] = r;    
+                
+            for (j = myS1.first; j < myS1.second; j++)
                 it[j] = g;
-
-            
-            
+            for (j = myS2.first; j < myS2.second; j++)
+                it[j] = g;        
+                
             
       - addressable_lambda:
           update_interval: 50ms
-          name: "OLD clockwork"
+          name: "Stripes 1 Ring"
           
           # L'idea è la seguente:
           # si definiscono un po' di const per inizio/fine dei tre display
@@ -188,56 +218,67 @@ light:
           
           
           lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
             auto time = id(rtc_time).now();
-            int myH = time.hour;
-            int myM = time.minute;
-            int myS = time.second;
-            int lM = 0, lum = 0;
-            auto r = Color(128,0,0);
-            auto g = Color(0,128,0);
-            auto b = Color(0,0,128);
+            Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
+            const int myR[2] = {samulogio::START_LARGE, samulogio::START_LARGE + samulogio::R3};
+            int j;
+            std::pair<int, int> myS1, myM1, myH1, myS2, myM2, myH2;
+            std::pair<int, int> *t1, *t2;
             
-            it.range(0, it.size()) = Color::BLACK;
-            myH = myH % 12;
-            it.range(start_small, 
-                        start_small + 
-                        (myH + 11) % 12 + 1) 
-                    = b;
+            myH2 = GetFirstAndLastTime(time.hour, 12, samulogio::R3,  samulogio::OFFSET_R3, samulogio::START_LARGE, time.hour, 0);
+            myM2 = GetFirstAndLastTime(time.minute, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, time.minute, 0);
+            myS2 = GetFirstAndLastTime(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, time.second, 0);
             
-            lM = (((myM + 59) % 60) + 1)*2/5;
-            it.range(start_mid,
-                    start_mid + lM) =  r;
-            lM = start_mid + lM;
-            lum = myM % 5;
-            lum *=60;
-            lum += myS;
-            //lum compreso tra 0 e 300
-            if (lum >= 150)
+            for (j=0; j < 3; j++)
             {
-            
-                lum -=150;
-                it[lM] = r;
-                lM++;
+                switch (j)
+                {
+                    case 0:
+                        t1 = &myH1, t2 = &myH2;
+                        break;
+                    case 1:
+                        t1 = &myM1, t2 = &myM2;
+                        break;
+                    case 2:
+                        t1 = &myS1, t2 = &myS2;
+                        break;
+                }
+                if ((t2->first) > (t2->second))
+                {
+                    t1->first = t2->first;
+                    t1->second = myR[1];
+                    t2->first = myR[0];
+                }
+                else    //make a useless pair
+                {
+                    t1->first = 1;
+                    t1->second = 0;
+                }
             }
-            //lum tra 0 e 150
-            lum = 128*lum/150;
-            it[lM] = Color(lum,0,0);
-            it.range(start_large,
-                    start_large + (myS + 59) % 60 + 1) = g;
-
+            
+            
+            it.range(0, it.size()) = Color::BLACK;            
+            for (j = myH1.first; j < myH1.second; j++)
+                it[j] = b;
+            for (j = myH2.first; j < myH2.second; j++)
+                it[j] = b;
+                
+            for (j = myM1.first; j < myM1.second; j++)
+                it[j] = it[j].get() + r;
+            for (j = myM2.first; j < myM2.second; j++)
+                it[j] = it[j].get() + r;    
+                
+            for (j = myS1.first; j < myS1.second; j++)
+                it[j] = it[j].get() + g;
+            for (j = myS2.first; j < myS2.second; j++)
+                it[j] = it[j].get() + g;        
+                
+            
+            
             
       - addressable_lambda:
           update_interval: 50ms
-          name: "BIG RING"
+          name: "5 - 3 - 1"
           
           # L'idea è la seguente:
           # si definiscono un po' di const per inizio/fine dei tre display
@@ -252,85 +293,66 @@ light:
           
           
           lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
             auto time = id(rtc_time).now();
-            int myH = time.hour;
-            int myM = time.minute;
-            int myS = time.second;
-            int low_cut, mid_cut, high_cut;
-            auto r = Color(128,0,0);
-            auto g = Color(0,128,0);
-            auto b = Color(0,0,128);
-            auto bot = Color(128,128,128), mid = Color::BLACK, top = Color::BLACK;
+            const Color r = Color(192,0,0), g = Color(0,192,0), b = Color(0,0,192);    //should be moved to HPP
+            const Color dr = Color (168,0,0), db = Color (0,0,48);
+            const Color bs[5]  = {b - db - db, b - db, b, b-db, b- db - db},
+                        rs[3]  =              {r - dr, r, r- dr};
+            const int myR[2] = {samulogio::START_LARGE, samulogio::START_LARGE + samulogio::R3};
+            int j, c_i;
+            std::pair<int, int> myS1, myM1, myH1, myS2, myM2, myH2;
+            std::pair<int, int> *t1, *t2;
             
-            char myCase = 0;
-            myH = myH * 5;
-            myH = (myH + 59) % 60 + 1;
-            myM = (myM + 59) % 60 + 1;
-            myS = (myS + 59) % 60 + 1;
+            myH2 = GetFirstAndLastIndex(time.hour, 12, samulogio::R3,  samulogio::OFFSET_R3, samulogio::START_LARGE, 2, 2);
+            myM2 = GetFirstAndLastIndex(time.minute, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 1, 1);
+            myS2 = GetFirstAndLastIndex(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 0, 0);
             
-            
-            myCase += (myH >= myM? 4: 0);
-            myCase += (myM >= myS? 2: 0);
-            myCase += (myH >= myS? 1: 0);
-            switch (myCase)
+            for (j=0; j < 3; j++)
             {
-                case 0: //smh
-                    top = g;
-                    mid = top + r;
-                    high_cut = myS;
-                    mid_cut = myM;
-                    low_cut = myH;
-                    break;
-                case 2: //msh
-                    top = r;
-                    mid = top + g;
-                    high_cut = myM;
-                    mid_cut = myS;
-                    low_cut = myH;
-                    break;
-                case 3: //mhs
-                    top = r;
-                    mid = top + b;
-                    high_cut = myM;
-                    mid_cut = myH;
-                    low_cut = myS;
-                    break;
-                case 4: //shm
-                    top = g;
-                    mid = top + b;
-                    high_cut = myS;
-                    mid_cut = myH;
-                    low_cut = myM;
-                    break;
-               case 5: //hsm
-                    top = b;
-                    mid = top + g;
-                    high_cut = myH;
-                    mid_cut = myS;
-                    low_cut = myM;
-                    break;
-               case 7: //hms
-                    top = b;
-                    mid = top + r;
-                    high_cut = myH;
-                    mid_cut = myM;
-                    low_cut = myS;
-                    break;
+                switch (j)
+                {
+                    case 0:
+                        t1 = &myH1, t2 = &myH2;
+                        break;
+                    case 1:
+                        t1 = &myM1, t2 = &myM2;
+                        break;
+                    case 2:
+                        t1 = &myS1, t2 = &myS2;
+                        break;
+                }
+                if ((t2->first) > (t2->second))
+                {
+                    t1->first = t2->first;
+                    t1->second = myR[1];
+                    t2->first = myR[0];
+                }
+                else    //make a useless pair
+                {
+                    t1->first = 1;
+                    t1->second = 0;
+                }
             }
-            it.range(0, it.size()) = Color::BLACK;
-            it.range(start_large, start_large + low_cut) = bot;
-            it.range(start_large + low_cut, start_large + mid_cut) = mid;
-            it.range(start_large + mid_cut, start_large + high_cut) = top;
-
+            
+            
+            
+            
+            it.range(0, it.size()) = Color::BLACK;            
+            for (j = myH1.first, c_i = 0; j < myH1.second; j++, c_i++)
+                it[j] = bs[c_i];
+            for (j = myH2.first; j < myH2.second; j++, c_i++)
+                it[j] = bs[c_i];
+            
+            for (j = myM1.first, c_i = 0; j < myM1.second; j++, c_i++)
+                it[j] = it[j].get() + rs[c_i];
+            for (j = myM2.first; j < myM2.second; j++)
+                it[j] = it[j].get() + rs[c_i];
+                
+            for (j = myS1.first; j < myS1.second; j++)
+              it[j] = it[j].get() + g;
+            for (j = myS2.first; j < myS2.second; j++)
+              it[j] = it[j].get() + g;        
+            
             
             
       - addressable_lambda:

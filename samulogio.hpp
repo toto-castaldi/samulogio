@@ -92,11 +92,11 @@ std::pair<int,int> GetFirstAndLastIndex(int target, int max_target, int nElement
     ledBefore = ledBefore % nElements;
     ledAfter = ledAfter % nElements;
     int cP = Get_Centerpoint(target, max_target, nElements, offset, indexOfLed0);    //4
-    myAnsw.first = (cP - ledBefore) % nElements;
-	myAnsw.second = (cP + ledAfter) % nElements;
+    myAnsw.first = (cP - ledBefore);
+	myAnsw.second = (cP + ledAfter)+1;// must consider offset!
 	
-	while (myAnsw.first < 0) myAnsw.first+=nElements;
-	while (myAnsw.second < 0) myAnsw.second+=nElements;
+	while (myAnsw.first < indexOfLed0) myAnsw.first+=nElements;
+	while (myAnsw.second > nElements + indexOfLed0) myAnsw.second-=nElements;
 	return myAnsw;
 }
 std::pair<int,int> GetFirstAndLastTime(int target, int max_target, int nElements, int offset, int indexOfLed0, int deltaBefore, int deltaAfter)
@@ -107,8 +107,18 @@ std::pair<int,int> GetFirstAndLastTime(int target, int max_target, int nElements
     if (deltaAfter < 0) deltaAfter *= -1;
     
     myAnsw.first = Get_Centerpoint(target - deltaBefore, max_target, nElements, offset, indexOfLed0);    //4
-	myAnsw.second = Get_Centerpoint(target - deltaBefore, max_target, nElements, offset, indexOfLed0);
+	myAnsw.second = Get_Centerpoint(target + deltaAfter, max_target, nElements, offset, indexOfLed0);
 	
+	myAnsw.first++;
+	myAnsw.second++;
+	
+	
+	if (myAnsw.first == myAnsw.second)
+	{
+		myAnsw.first = indexOfLed0;
+		myAnsw.second = indexOfLed0 + nElements;
+		
+	}		
 	return myAnsw;
 }
 
