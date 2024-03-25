@@ -1,5 +1,7 @@
 esphome:
   name: esphome-led
+  includes:
+    - samulogio.hpp
   on_boot:
     priority: -100
     # ...
@@ -17,12 +19,12 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "MxaGqn5SMmKfR6XuPYftxRZV61V/2vYwKcJOfhQ/FFQ="
+    key: !secret encr_Key
 ota:
 
 wifi:
-  ssid: mySSID
-  password: mypassword
+  ssid: !secret WiFi_SSID
+  password: !secret WiFi_PWD
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
@@ -45,30 +47,26 @@ time:
   - platform: ds1307
     id: rtc_time
     address: 0x50
-#  address: 0x68
-
-    # repeated synchronization is not necessary unless the external RTC
-    # is much more accurate than the internal clock
     update_interval: never
 
 number:
   - platform: template
     id: hhh
-    name: "hour"
+    name: "Test hour"
     step: 1
     min_value: 0
     max_value: 23
     optimistic: true
   - platform: template
     id: mmm
-    name: "minutes"
+    name: "Test minutes"
     step: 1
     min_value: 0
     max_value: 59
     optimistic: true
   - platform: template
     id: sss
-    name: "seconds"
+    name: "Test seconds"
     step: 1
     min_value: 0
     max_value: 59
@@ -79,7 +77,7 @@ light:
   - platform: neopixelbus
     type: GRB
     variant: WS2811
-    pin: GPIO12
+    pin: GPIO14
     num_leds: 96
     name: "NeoPixel Light"
     id: light_switch
@@ -93,9 +91,47 @@ light:
       - addressable_color_wipe:
       - addressable_scan:
           scan_width: 5
+
+
       - addressable_lambda:
           update_interval: 50ms
-          name: "anti-clockwork"
+          name: "1 Led 3 Rings"
+          lambda: |-
+            auto time = id(rtc_time).now();
+            Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
+            int myH, myM, myS;
+            
+            it.range(0, it.size()) = Color::BLACK;
+            
+            myH = Get_Centerpoint(time.hour, 12, samulogio::R1, samulogio::OFFSET_R1, samulogio::START_SMALL);
+            myM = Get_Centerpoint(time.minute, 60, samulogio::R2, samulogio::OFFSET_R2, samulogio::START_MID);
+            myS = Get_Centerpoint(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            
+            it[myH] = b;
+            it[myM] = r;
+            it[myS] = g;
+            
+      - addressable_lambda:
+          update_interval: 50ms
+          name: "1 Led 1 Ring"
+          lambda: |-
+            auto time = id(rtc_time).now();
+            Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
+            int myH, myM, myS;
+            
+            it.range(0, it.size()) = Color::BLACK;
+            
+            myH = Get_Centerpoint(time.hour, 12, samulogio::R1, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            myM = Get_Centerpoint(time.minute, 60, samulogio::R2, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            myS = Get_Centerpoint(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
+            
+            it[myH] = b;
+            it[myM] = it[myM].get() + r;
+            it[myS] = it[myS].get() + g;
+
+      - addressable_lambda:
+          update_interval: 1000ms
+          name: "NEW clockwork"
           
           # L'idea è la seguente:
           # si definiscono un po' di const per inizio/fine dei tre display
@@ -110,59 +146,34 @@ light:
           
           
           lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
             auto time = id(rtc_time).now();
-            int myH = time.hour;
-            int myM = time.minute;
-            int myS = time.second;
-            int lM = 0, lum = 0;
-            auto r = Color(128,0,0);
-            auto g = Color(0,128,0);
-            auto b = Color(0,0,128);
+            Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
+            Color dr = Color (100,0,0), db = Color (0,0,50);
+            int j;
+            std::pair<int, int> myS, myM, myH;
+            
+            
+            myS = GetFirstAndLastIndex(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, time.second, 0);
+            myM = GetFirstAndLastIndex(time.minute, 60, samulogio::R2, samulogio::OFFSET_R2, samulogio::START_MID, time.minute, 0);
+            myH = GetFirstAndLastIndex(time.hour, 12, samulogio::R1,  samulogio::OFFSET_R1, samulogio::START_SMALL, time.hour, 0);
+            
+            ESP_LOGI("my_lib","hour %d    %d  vs %d", myH.first, myH.second, time.hour);
+            ESP_LOGI("my_lib","minutes %d    %d vs %d", myM.first, myM.second, time.minute);
+            ESP_LOGI("my_lib","seconds %d    %d vs %d", myS.first, myS.second, time.second);
+            it.range(0, it.size()) = Color::BLACK;            
+            for (j = myH.first; j != myH.second; j=(j+1)%samulogio::R1)
+                it[j] = b;
+            for (j = myM.first; j != myM.second; j=(j+1)%samulogio::R2)
+                it[j] = r;
+            for (j = myS.first; j != myS.second; j=(j+1)%samulogio::R3)
+                it[j] = g;
+
             
             
             
-            it.range(start_small, end_small+1) = b;
-            it.range(start_mid, end_mid+1) = r;
-            it.range(start_large, end_large+1) = g;
-            
-            myH = myH % 12;
-            it.range(start_small, 
-                        start_small + 
-                        (myH + 11) % 12 + 1) 
-                    = Color::BLACK;
-            
-            lM = (((myM + 59) % 60) + 1)*2/5;
-            it.range(start_mid,
-                    start_mid + lM) = Color::BLACK;
-            lM = start_mid + lM;
-            lum = myM % 5;
-            lum *=60;
-            lum += myS;
-            //lum compreso tra 0 e 300
-            if (lum >= 150)
-            {
-            
-                lum -=150;
-                it[lM] = Color::BLACK;
-                lM++;
-            }
-            //lum tra 0 e 150
-            lum = 255-128*lum/150;
-            it[lM] = Color(lum,0,0);
-            it.range(start_large,
-                    start_large + (myS + 59) % 60 + 1) = Color::BLACK;      
       - addressable_lambda:
           update_interval: 50ms
-          name: "clockwork"
+          name: "OLD clockwork"
           
           # L'idea è la seguente:
           # si definiscono un po' di const per inizio/fine dei tre display
@@ -222,180 +233,7 @@ light:
             it[lM] = Color(lum,0,0);
             it.range(start_large,
                     start_large + (myS + 59) % 60 + 1) = g;
-      - addressable_lambda:
-          update_interval: 50ms
-          name: "Comet"
-          
-          # L'idea è la seguente:
-          # si definiscono un po' di const per inizio/fine dei tre display
-          # myH,myM e myS rappresentano ore, minuti e secondi
-          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
-          # Per ore e secondi è "facile"
-          # Per minuti si deve prendere il resto a 5 minuti
-          # Ogni 5 minuti sono 2 led (da cui il *2/5)
-          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
-          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
-          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
-          
-          
-          lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
-            auto time = id(rtc_time).now();
-            int myH = time.hour;
-            int myM = time.minute;
-            int myS = time.second;
-            int low_cut, mid_cut, high_cut;
-            Color r = Color(128,0,0);
-            Color g = Color(0,128,0);
-            Color b = Color(0,0,128);
-            Color dr = Color (100,0,0);
-            Color db = Color (0,0,50);
-            
-            myH = myH * 5 % 12;
-            it.range(0, it.size()) = Color::BLACK;
-            it[start_large + myS] = g;
-            it[start_large + myM] = it[start_large + myM].get() + r;
-            it[start_large + (myM+59)%60] = it[start_large + (myM+59)%60].get() + (r - dr);
-            it[start_large + (myM+1)%60] = it[start_large + (myM+1)%60].get() + (r - dr);
-            
-            it[start_large + myH] = it[start_large + myH].get() + b;
-            it[start_large + (myH+59)%60] = it[start_large + (myH+59)%60].get() + (b - db);
-            it[start_large + (myH+58)%60] = it[start_large + (myH+58)%60].get() + ((b - db) - db);
-            it[start_large + (myH+1)%60] = it[start_large + (myH+1)%60].get() + (b - db);
-            it[start_large + (myH+2)%60] = it[start_large + (myH+2)%60].get() + ((b - db) - db);
-            
-            
 
-                    
-      - addressable_lambda:
-          update_interval: 50ms
-          name: "One Big Dot"
-          
-          # L'idea è la seguente:
-          # si definiscono un po' di const per inizio/fine dei tre display
-          # myH,myM e myS rappresentano ore, minuti e secondi
-          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
-          # Per ore e secondi è "facile"
-          # Per minuti si deve prendere il resto a 5 minuti
-          # Ogni 5 minuti sono 2 led (da cui il *2/5)
-          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
-          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
-          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
-          
-          
-          lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
-            auto time = id(rtc_time).now();
-            int myH = time.hour;
-            int myM = time.minute;
-            int myS = time.second;
-            int low_cut, mid_cut, high_cut;
-            auto r = Color(128,0,0);
-            auto g = Color(0,128,0);
-            auto b = Color(0,0,128);
-            
-            myH = myH * 5 % 12;
-            it.range(0, it.size()) = Color::BLACK;
-            it[start_large + myS] = g;
-            it[start_large + myM] = it[start_large + myM].get() + r;
-            it[start_large + myH] = it[start_large + myH].get() + b;
-
-      - addressable_lambda:
-          update_interval: 50ms
-          name: "Running Dots"
-          
-          # L'idea è la seguente:
-          # si definiscono un po' di const per inizio/fine dei tre display
-          # myH,myM e myS rappresentano ore, minuti e secondi
-          # E' sempre presente un operatore  "(x + numero - 1) % numero + 1" per far si che resto zero sia in realtà "tutto pieno"
-          # Per ore e secondi è "facile"
-          # Per minuti si deve prendere il resto a 5 minuti
-          # Ogni 5 minuti sono 2 led (da cui il *2/5)
-          # I minuti rimanenti si trasformano in secondi e gli si aggiungono i secondi 
-          # Se il risultato è > 150 (= 2 min e 30 s) si aggiunge un altro led ai minuti, e si toglie 150 a questo numero
-          # A questo punto questo numero (tra 0 e 150) viene usato per la luminosità
-          
-          
-          lambda: |-
-            //costanti per numero di luci
-            const int NCICLI_WAIT = 200, NCICLI_RUN = 24;
-            const uint8_t MY_SCALE = 128;
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            static int rH = 0, rM = 0, rS = 0, count_w = 1, count_r = 0;
-            auto time = id(rtc_time).now();
-            
-            int myH = time.hour % 12, myM = time.minute, myS = time.second;
-            
-            Color r = Color(128,0,0);
-            Color g = Color(0,128,0);
-            Color b = Color(0,0,128);
-            Color delta = Color(25,25,25);
-            it.range(start_large, end_large + 1) = Color::BLACK;
-            it[start_large + ((myS-0) % R3)] = g;
-            it[start_large + ((myS-1) % R3)] = g - delta;
-            it[start_large + ((myS-2) % R3)] = g - delta - delta;
-            it[start_large + ((myS-3) % R3)] = g - delta - delta - delta;
-            
-            
-            if (count_w == 0)
-            {
-                count_r = NCICLI_RUN;
-                rH = 0;
-                rM = 0;
-            }else{
-                count_w++;
-                count_w = (count_w % NCICLI_WAIT);
-            }
-            
-            
-            if (count_r != 0)   //Fai l'effetto
-            {
-                if (count_r == NCICLI_RUN) 
-                    it.range(start_small, end_mid + 1) = Color::BLACK;
-                
-                if (rH <= myH)
-                {
-                    it[start_small + rH] = b;
-                    for (int i = 0; i<rH; i++)
-                        it[start_small + i] = it[start_small + i].get()-delta;
-                }
-                rH++;
-                
-                myM = myM * 2 / 5;
-                if (rM <= myM)
-                {
-                    it[start_mid + rM] = r;
-                    for (int i = 0; i<rM; i++)
-                        it[start_mid + i] = it[start_mid + i].get()-delta;
-                }
-                rM++;
-                count_r--;
-                count_w++;
-            }
-            
-            
             
       - addressable_lambda:
           update_interval: 50ms
@@ -496,59 +334,24 @@ light:
             
             
       - addressable_lambda:
-          update_interval: 5000ms
+          update_interval: 1000ms
           name: "test"
           
           lambda: |-
-            //costanti per numero di luci
-            const int R1 = 12, R2 = 24, R3 = 60;
-            const int start_small = 0;
-            const int end_small = start_small - 1 + R1;
-            const int start_mid = end_small + 1;
-            const int end_mid = start_mid - 1 + R2;
-            const int start_large = end_mid + 1;
-            const int end_large = start_large -1 + R3;
-            
-            int myH = id(hhh).state;
-            int myM = id(mmm).state;
-            int myS = id(sss).state;
-            int lM = 0, lum = 0;
-            auto r = Color(128,0,0);
-            auto g = Color(0,128,0);
-            auto b = Color(0,0,128);
+            Color r = Color(128,0,0), g = Color(0,128,0), b = Color(0,0,128);    //should be moved to HPP
+            int myH, myM, myS;
             
             it.range(0, it.size()) = Color::BLACK;
-            myH = myH % 12;
-            it.range(start_small, 
-                        start_small + 
-                        (myH + 11) % 12 + 1) 
-                    = b;
             
-            lM = (((myM + 59) % 60) + 1)*2/5;
+            myH = Get_Centerpoint(id(hhh).state, 12, samulogio::R1, samulogio::OFFSET_R1, samulogio::START_SMALL);
+            myM = Get_Centerpoint(id(mmm).state, 60, samulogio::R2, samulogio::OFFSET_R2, samulogio::START_MID);
+            myS = Get_Centerpoint(id(sss).state, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE);
             
-            it.range(start_mid,
-                    start_mid + lM) =  r;
             
-            lM = start_mid + lM;
+            it[myH] = b;
+            it[myM] = r;
+            it[myS] = g;
             
-            lum = myM % 5;
-            lum *=60;
-            lum += myS;
-            //lum compreso tra 0 e 300
-            
-            if (lum >= 150)
-            {
-            
-                lum -=150;
-                it[lM] = r;
-                lM++;
-            }
-            //lum tra 0 e 150
-            lum = 128*lum/150;
-            it[lM] = Color(lum,0,0);
-            it.range(start_large,
-                    start_large + (myS + 59) % 60 + 1) = g;
-
             
 web_server:
   port: 80
