@@ -295,63 +295,39 @@ light:
           lambda: |-
             auto time = id(rtc_time).now();
             const Color r = Color(192,0,0), g = Color(0,192,0), b = Color(0,0,192);    //should be moved to HPP
-            const Color dr = Color (168,0,0), db = Color (0,0,48);
+            const Color dr = Color (96,0,0), db = Color (0,0,48);
             const Color bs[5]  = {b - db - db, b - db, b, b-db, b- db - db},
                         rs[3]  =              {r - dr, r, r- dr};
             const int myR[2] = {samulogio::START_LARGE, samulogio::START_LARGE + samulogio::R3};
+            const int N_HOUR = 5, N_MIN = 3;
+            int redLeds[N_MIN], blueLeds[N_HOUR];
             int j, c_i;
-            std::pair<int, int> myS1, myM1, myH1, myS2, myM2, myH2;
-            std::pair<int, int> *t1, *t2;
+            std::pair<int, int> myS, myM, myH;
             
-            myH2 = GetFirstAndLastIndex(time.hour, 12, samulogio::R3,  samulogio::OFFSET_R3, samulogio::START_LARGE, 2, 2);
-            myM2 = GetFirstAndLastIndex(time.minute, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 1, 1);
-            myS2 = GetFirstAndLastIndex(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 0, 0);
+            myH = GetFirstAndLastIndex(time.hour, 12, samulogio::R3,  samulogio::OFFSET_R3, samulogio::START_LARGE, 2, 2);
+            myM = GetFirstAndLastIndex(time.minute, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 1, 1);
+            myS = GetFirstAndLastIndex(time.second, 60, samulogio::R3, samulogio::OFFSET_R3, samulogio::START_LARGE, 0, 0);
             
-            for (j=0; j < 3; j++)
-            {
-                switch (j)
-                {
-                    case 0:
-                        t1 = &myH1, t2 = &myH2;
-                        break;
-                    case 1:
-                        t1 = &myM1, t2 = &myM2;
-                        break;
-                    case 2:
-                        t1 = &myS1, t2 = &myS2;
-                        break;
-                }
-                if ((t2->first) > (t2->second))
-                {
-                    t1->first = t2->first;
-                    t1->second = myR[1];
-                    t2->first = myR[0];
-                }
-                else    //make a useless pair
-                {
-                    t1->first = 1;
-                    t1->second = 0;
-                }
-            }
+            for(j = 0; j < N_HOUR; j++)
+               blueLeds[j] = myH.first + j;
+               
+            for(j = 0; j < N_MIN; j++)
+               redLeds[j] = myM.first + j;
+               
+            if ((myH.first) > (myH.second))   //then need a zero
+                    for(j = myH.second; j > 0; j--)
+                        blueLeds[N_HOUR - j] -= samulogio::R3;
+            if ((myM.first) > (myM.second))   //then need a zero
+                    for(j = myM.second; j > 0; j--)
+                        redLeds[N_HOUR - j] -= samulogio::R3;
             
+            it.range(0, it.size()) = Color::BLACK;
+            for (j = 0; j < N_HOUR; j++)
+                it[blueLeds[j]] = bs[j];
+            for (j = 0; j < N_MIN; j++)
+                it[redLeds[j]] = it[redLeds[j]].get() + rs[j];
             
-            
-            
-            it.range(0, it.size()) = Color::BLACK;            
-            for (j = myH1.first, c_i = 0; j < myH1.second; j++, c_i++)
-                it[j] = bs[c_i];
-            for (j = myH2.first; j < myH2.second; j++, c_i++)
-                it[j] = bs[c_i];
-            
-            for (j = myM1.first, c_i = 0; j < myM1.second; j++, c_i++)
-                it[j] = it[j].get() + rs[c_i];
-            for (j = myM2.first; j < myM2.second; j++)
-                it[j] = it[j].get() + rs[c_i];
-                
-            for (j = myS1.first; j < myS1.second; j++)
-              it[j] = it[j].get() + g;
-            for (j = myS2.first; j < myS2.second; j++)
-              it[j] = it[j].get() + g;        
+              it[myS.first] = it[myS.first].get() + g;        
             
             
             
