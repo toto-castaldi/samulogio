@@ -349,7 +349,85 @@ light:
             it[myH] = b;
             it[myM] = r;
             it[myS] = g;
+     
+      - addressable_lambda:
+          update_interval: 100ms
+          name: "draw"
+          
+          lambda: |-
+            static int j = 0;
+            static int flip = 0;
+            const int NLEDS = 57;
+            const int MY_HEART[NLEDS] =             
+            {12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+            7,8, 9, 10, 11, 12, 13,
+            76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
+            36,37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55};
+            static int r=0, g=97, b=161;
+            static Color c = Color (0,0,0);
+            
+            j = j % NLEDS;
+            
+            if (j==0) 
+            {
+                flip = (flip+1) % 2;
+                r = g;
+                g = b;
+                b = randX(0,192);
+                c = Color(r,g,b);
+
+            }                
             
             
+            if (flip != 0)
+            {
+                if (j==0) it.range(0, it.size()) = Color::BLACK;
+                it[MY_HEART[j]] = c;
+            }
+            else
+                it[MY_HEART[j]] = Color(0,0,0);
+                
+            j++;
+            //ESP_LOGI("","%d",j);
+      - addressable_lambda:
+          update_interval: 100ms
+          name: "Face"
+          
+          lambda: |-
+            
+            const int MY_FACE[2][5] =  {{12, 56, 0, 76, 36},
+                                        {35, 75, 11, 95, 55}};
+            static int isBlack = 0;
+            static int which_part = 0, j = 12;
+            static Color c = Color (128,128,128);
+            static int r = 0, g = 29, b =158;
+
+
+            if (isBlack == 0)
+                it[j] = Color(0,0,0);
+            else
+                it[j] = c;                                          //color yourself
+            
+            
+            if (isBlack != 0)
+            {
+                if (j != MY_FACE[1][which_part])
+                    j++;                                            //lookahead
+                else
+                {
+                    which_part++;
+                    which_part %=5;
+                    j = MY_FACE[0][which_part];
+                    if (which_part != 4)                            // need a new color
+                    {
+                        
+                            r = g;
+                            g = b;
+                            b = randX(0,192);
+                            c = Color(r,g,b);
+                    }
+                }
+            }
+            isBlack = (isBlack + 1 ) % 2;
 web_server:
   port: 80

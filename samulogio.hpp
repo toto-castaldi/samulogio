@@ -8,6 +8,8 @@
 // SML means Small -> Medium -> Large
 #include <bitset>
 #include <utility>
+#include <cstdlib> // Include the necessary header
+#include <time.h>
 #define SML
 namespace samulogio
 {
@@ -48,7 +50,7 @@ const int START_LARGE = R1 + R2;
 
 const int OFFSET_R1 = +3;
 const int OFFSET_R2 = -3;
-const int OFFSET_R3 = 30;
+const int OFFSET_R3 = -29;
 
 }
 
@@ -122,3 +124,9 @@ std::pair<int,int> GetFirstAndLastTime(int target, int max_target, int nElements
 	return myAnsw;
 }
 
+int randX(int l, int h)
+{
+	std::srand(::time(0));
+	return l + std::rand() % (h-l+1);
+	
+}
